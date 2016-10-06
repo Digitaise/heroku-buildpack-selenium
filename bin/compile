@@ -99,3 +99,9 @@ export INCLUDE_PATH="\$HOME/.apt/usr/include:\$INCLUDE_PATH"
 export CPATH="\$INCLUDE_PATH"
 export CPPPATH="\$INCLUDE_PATH"
 EOF
+
+echo "Starting Xvfb ..."
+Xvfb :10 -screen 0 1366x768x24 -ac &
+
+echo "Starting Google Chrome ..."
+google-chrome --remote-debugging-port=9222 &
