@@ -64,3 +64,12 @@ mkdir -p $BUILD_DIR/.profile.d
 cat <<EOF >$BUILD_DIR/.profile.d/chromedriver.sh
 export PATH="\$HOME/vendor/chromedriver:\$PATH"
 EOF
+
+# Start Xvfb, Chrome in the background
+export DISPLAY=:10
+
+echo "Starting Xvfb ..."
+Xvfb :10 -screen 0 1366x768x24 -ac &
+
+echo "Starting Google Chrome ..."
+google-chrome &
