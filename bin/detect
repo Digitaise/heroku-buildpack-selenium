@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # bin/detect <build-dir>
 
-if [ -f $1/Aptfile ]; then
-  echo "Apt" && exit 0
-else
+if [ -d $1/vendor/chromedriver ]; then
   echo "no" && exit 1
+else
+  echo "ChromeDriver" && exit 0
 fi

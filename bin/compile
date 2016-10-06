@@ -10,7 +10,6 @@ set -e
 # parse and derive params
 BUILD_DIR=$1
 CACHE_DIR=$2
-LP_DIR=`cd $(dirname $0); cd ..; pwd`
 
 function error() {
   echo " !     $*" >&2
@@ -35,38 +34,33 @@ APT_STATE_DIR="$CACHE_DIR/apt/state"
 mkdir -p "$APT_CACHE_DIR/archives/partial"
 mkdir -p "$APT_STATE_DIR/lists/partial"
 
-APT_OPTIONS="-o debug::nolocking=true -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
+topic "Installing Chrome"
 
-topic "Updating apt caches"
-apt-get $APT_OPTIONS update | indent
+PACKAGE="https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+PACKAGE_NAME=$(basename $PACKAGE .deb)
+PACKAGE_FILE=$APT_CACHE_DIR/archives/$PACKAGE_NAME.deb
 
-topic "Fetching .debs for xserver-xorg-core libgl1-mesa-dri xvfb libglide3 xfs unzip"
-apt-get $APT_OPTIONS -y -d install xvfb | indent
+topic "Fetching $PACKAGE"
+curl -s -L -z $PACKAGE_FILE -o $PACKAGE_FILE $PACKAGE 2>&1 | indent
 
-topic "Fetching google chrome"
-CHROME_URL="https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
-curl $CHROME_URL -s -o $APT_CACHE_DIR/archives/google-chrome-stable_current_amd64.deb
+topic "Installing $PACKAGE"
+dpkg -x $PACKAGE_FILE $BUILD_DIR/.apt/
+cd $BUILD_DIR/.apt/usr/bin
+ln -s ../../opt/google/chrome/google-chrome google-chrome
 
-mkdir -p $BUILD_DIR/.apt
 
-for DEB in $(ls -1 $APT_CACHE_DIR/archives/*.deb); do
-  topic "Installing $(basename $DEB)"
-  dpkg -x $DEB $BUILD_DIR/.apt/
-done
+topic "Downloading and installing ChromeDriver"
 
-export PATH="$BUILD_DIR/.apt/usr/bin:$PATH"
-export LD_LIBRARY_PATH="$BUILD_DIR/.apt/usr/lib:$LD_LIBRARY_PATH"
-export INCLUDE_PATH="$BUILD_DIR/.apt/usr/include:$INCLUDE_PATH"
-export CPATH="$INCLUDE_PATH"
-export CPPPATH="$INCLUDE_PATH"
+mkdir -p $BUILD_DIR/vendor/chromedriver
 
-# Download and copy the ChromeDriver to /usr/local/bin
-wget "https://chromedriver.googlecode.com/files/chromedriver_linux64_2.2.zip"
-unzip chromedriver_linux64_2.2.zip
-mv chromedriver $BUILD_DIR/.apt/usr/bin
+chromedriver_url="http://chromedriver.storage.googleapis.com/2.16/chromedriver_linux64.zip"
+curl $chromedriver_url -s -o $BUILD_DIR/vendor/chromedriver/chromedriver.zip
+unzip $BUILD_DIR/vendor/chromedriver/chromedriver.zip -d $BUILD_DIR/vendor/chromedriver
+rm $BUILD_DIR/vendor/chromedriver/chromedriver.zip
+ls -lah $BUILD_DIR/vendor/chromedriver
 
-echo "Starting Xvfb ..."
-Xvfb :10 -screen 0 1366x768x24 -ac &
-
-echo "Starting Google Chrome ..."
-google-chrome --remote-debugging-port=9222 &
+topic "Writing profile script"
+mkdir -p $BUILD_DIR/.profile.d
+cat <<EOF >$BUILD_DIR/.profile.d/chromedriver.sh
+export PATH="\$HOME/vendor/chromedriver:\$PATH"
+EOF
