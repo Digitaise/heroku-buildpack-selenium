@@ -100,7 +100,12 @@ export CPATH="\$INCLUDE_PATH"
 export CPPPATH="\$INCLUDE_PATH"
 EOF
 
+ldconfig -v | grep "libGL"
+
 export DISPLAY=:10
+
+ln -s $BUILD_DIR/.apt/usr/lib/i386-linux-gnu/mesa/libGL.so.1 $BUILD_DIR/.apt/usr/lib/libGL.so.1
+
 
 echo "Starting Xvfb ..."
 Xvfb :10 -screen 0 1366x768x24 -ac &
