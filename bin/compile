@@ -72,6 +72,7 @@ export DISPLAY=:10
 # symlink libs to where Xvfb searches
 ln -s /lib/x86_64-linux-gnu/libudev.so.1 $1/.apt/usr/lib/libudev.so.0
 ln -s /app/.apt/usr/lib/x86_64-linux-gnu/libXfont.so.1 $1/.apt/usr/lib/libXfont.so.1
+ln -s /app/.apt/usr/lib/x86_64-linux-gnu/libGL.so.1 $1/.apt/usr/lib/libGL.so.1
 
 # patch Xvfb to use /app/.. paths instead of hardcoded wrong values
 sed -i.bak s/usr\\/bin/app\\/ubi/g $1/.apt/usr/bin/Xvfb
