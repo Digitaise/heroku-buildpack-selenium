@@ -1,91 +1,67 @@
 #!/bin/sh
+#
+# Compiles a static xvfb for the Heroku platform.
+#
+# This script is a conglomeration of:
+#   * https://github.com/ddollar/heroku-buildpack-apt
+#   * http://stackoverflow.com/questions/14845291/compile-static-linked-binary-of-xvfb
+#   * gumption
 
-BUILD_DIR=$1
-CACHE_DIR=$2
+set -e # fail fast
+#set -x # debug
 
-error() {
-  echo " !     $*" >&2
-  exit 1
-}
+alias indent="sed -e 's/^/    /'"
 
-topic() {
-  echo "-----> $*"
-}
+APT_ROOT=`mktemp -d`
+echo "Building xvfb in ${APT_ROOT}"
 
-indent() {
-  sed -u 's/^/       /'
-}
+BUILD_DIR="$APT_ROOT/build"
+CACHE_DIR="$APT_ROOT/cache"
+mkdir -p $BUILD_DIR $CACHE_DIR
 
-topic "BUILD_DIR: $BUILD_DIR"
-topic "CACHE_DIR: $CACHE_DIR"
+cd $BUILD_DIR
 
-APT_CACHE_DIR="$CACHE_DIR/apt/cache"
-APT_STATE_DIR="$CACHE_DIR/apt/state"
+# build-essential: compile tools
+# libdrm2: we'll need to configure xorg-server later
+# libtirpc-dev: provides static versions of some functions which are dynamic only in eglibc
+cat > $BUILD_DIR/Aptfile <<EOF
+xvfb
+build-essential
+libdrm2
+libtirpc-dev
+EOF
 
-mkdir -p "$APT_CACHE_DIR/archives/partial"
-mkdir -p "$APT_STATE_DIR/lists/partial"
+echo "Fetching apt buildpack"
+curl -Oq https://raw.githubusercontent.com/ddollar/heroku-buildpack-apt/master/bin/compile
+chmod u+x compile
 
-APT_OPTIONS="-o debug::nolocking=true -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
+echo "Running apt buildpack"
+./compile $BUILD_DIR $CACHE_DIR | indent
 
-topic "Updating apt caches"
+APT_OPTIONS="-o debug::nolocking=true -o dir::etc::sourcelist=${APT_ROOT}/apt-sources.list -o dir::cache=${APT_ROOT}/cache/apt/cache -o dir::state=${APT_ROOT}/cache/apt/state"
+
+echo "Enabling APT source repos"
+cp /etc/apt/sources.list $APT_ROOT/apt-sources.list
+cat /etc/apt/sources.list | sed 's/^deb /deb-src /' >> $APT_ROOT/apt-sources.list
 apt-get $APT_OPTIONS update | indent
 
-topic "Fetching .debs for xvfb and unzip"
-apt-get $APT_OPTIONS -y -d install xvfb unzip | indent
+echo "Downloading xorg-server source"
+apt-get $APT_OPTIONS source xorg-server | indent
 
-topic "Fetching google chrome"
-CHROME_URL="https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
-curl $CHROME_URL -s -o $APT_CACHE_DIR/archives/google-chrome-stable_current_amd64.deb
+echo "Configuring xorg-server"
+cd xorg-server-1.15.1
+./configure --enable-static | indent
 
-mkdir -p $BUILD_DIR/.apt
+echo "Building xorg-server"
+make | indent
 
-for DEB in $(ls -1 $APT_CACHE_DIR/archives/*.deb); do
-  topic "Installing $(basename $DEB)"
-  dpkg -x $DEB $BUILD_DIR/.apt/
-done
+cd hw/vfb
 
-# topic "Downloading and installing ChromeDriver to ${BUILD_DIR}"
-# mkdir -p "$BUILD_DIR/vendor/chromedriver/"
-# mkdir -p "$BUILD_DIR/vendor/chromedriver/bin"
-# export PATH="$BUILD_DIR/vendor/chromedriver/bin":$PATH
+echo "Cleaning xvfb"
+make clean | indent
 
-# chromedriver_url="http://chromedriver.storage.googleapis.com/2.9/chromedriver_linux64.zip"
-# curl $chromedriver_url -s -o "$BUILD_DIR/vendor/chromedriver/chromedriver.zip"
-# unzip "$BUILD_DIR/vendor/chromedriver/chromedriver.zip"
-# rm "$BUILD_DIR/vendor/chromedriver/chromedriver.zip"
-# mv "$BUILD_DIR/vendor/chromedriver/chromedriver" "$BUILD_DIR/vendor/chromedriver/bin"
-
-# topic "exporting PATH and LIBRARY_PATH"
-# PROFILE_PATH="$BUILD_DIR/.profile.d/chrome.sh"
-# mkdir -p $(dirname $PROFILE_PATH)
-# echo 'export PATH=".apt/usr/bin:vendor/chromedriver/bin:$PATH"'>> $PROFILE_PATH
-# echo 'export LD_LIBRARY_PATH=".apt/usr/lib:\$LD_LIBRARY_PATH"'>> $PROFILE_PATH
-# echo 'export INCLUDE_PATH=".apt/usr/include:\$INCLUDE_PATH"'>> $PROFILE_PATH
-# echo 'export CPATH="\$INCLUDE_PATH"'>> $PROFILE_PATH
-# echo 'export CPPPATH="\$INCLUDE_PATH"'>> $PROFILE_PATH
-
-# symlink libs to where Xvfb searches
-ln -s /lib/x86_64-linux-gnu/libudev.so.1 $1/.apt/usr/lib/libudev.so.0
-ln -s /app/.apt/usr/lib/x86_64-linux-gnu/libXfont.so.1 $1/.apt/usr/lib/libXfont.so.1
-ln -s /app/.apt/usr/lib/x86_64-linux-gnu/libGL.so.1 $1/.apt/usr/lib/libGL.so.1
-
-ln -s $1/.apt/usr/lib/libGL.so.1 $1/.apt/usr/lib/x86_64-linux-gnu/libGL.so.1
-
-# patch Xvfb to use /app/.. paths instead of hardcoded wrong values
-sed -i.bak s/usr\\/bin/app\\/ubi/g $1/.apt/usr/bin/Xvfb
-sed -i.bak s/usr\\/share\\/fonts/app\\/usr-s-fonts/g $1/.apt/usr/bin/Xvfb
-# create symlinks for Xvfb to use /app/.apt/usr/...
-ln -s /app/.apt/usr/bin $1/ubi
-ln -s /app/.apt/usr/share/fonts $1/usr-s-fonts
-
-export PATH="$PATH:$1/.apt/usr/bin"
-#export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$1/.apt/usr/lib:$1/.apt/usr/lib/x86_64-linux-gnu"
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$1/.apt/usr/lib"
-find $1/.apt/usr/share/fonts/X11 -type d | xargs $1/.apt/usr/bin/mkfontdir
-
-
-#echo "Starting Xvfb ..."
-Xvfb :10 &
-
-#echo "Starting Google Chrome ..."
-#./home/vcap/app/chrome/google-chrome &
+# LDFLAGS=-all-static asks libtool to do static linking
+# LD_EXPORT_SYMBOLS_FLAGS= causes --export-dynamic to be omitted
+# LIBS='...' fills in missing dependencies for static libraries
+echo "Recompiling xvfb"
+make LDFLAGS=-all-static LD_EXPORT_SYMBOLS_FLAG= LIBS='-lfreetype -lgpg-error -lfontenc -ltirpc -lz -lbz2 -lm -lrt -lpthread' | indent
