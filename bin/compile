@@ -1,3 +1,31 @@
 #!/bin/sh
 
+set -e
+
+BUILD_DIR=$1
+CACHE_DIR=$2
+
+# config
+# http://orm-buildpack.s3.amazonaws.com/Xvfb.tar.gz
+
+# Buildpack URL
+BUILDPACK_XVFB_PACKAGE=https://github.com/kenshin23/xvfb-portable-binary/raw/master/Xvfb.tar.xz
+
+mkdir -p $CACHE_DIR
+if ! [ -e $CACHE_DIR/$FILE_NAME ]; then
+  echo "-----> Fetching XVFB binaries at ${BUILDPACK_XVFB_PACKAGE}"
+  curl $BUILDPACK_XVFB_PACKAGE -s -o $CACHE_DIR/$FILE_NAME
+fi
+
+echo "-----> Extracting XVFB binaries to ${BUILD_DIR}/vendor/xvfb"
+tar jxf $CACHE_DIR/$FILE_NAME -C $CACHE_DIR
+mkdir -p $BUILD_DIR/bin
+mkdir -p $BUILD_DIR/share
+mkdir -p $BUILD_DIR/vendor/lib
+
+cp -R $CACHE_DIR/Xvfb/bin/* $BUILD_DIR/bin
+cp -R $CACHE_DIR/Xvfb/share/* $BUILD_DIR/share
+cp -R $CACHE_DIR/Xvfb/lib/* $BUILD_DIR/vendor/lib
+
+
 Xvfb :10 &
