@@ -9,7 +9,8 @@ CACHE_DIR=$2
 # http://orm-buildpack.s3.amazonaws.com/Xvfb.tar.gz
 
 # Buildpack URL
-BUILDPACK_XVFB_PACKAGE=https://github.com/kenshin23/xvfb-portable-binary/raw/master/Xvfb.tar.xz
+FILE_NAME=Xvfb.tar.xz
+BUILDPACK_XVFB_PACKAGE=https://raw.githubusercontent.com/kenshin23/xvfb-portable-binary/master/Xvfb.tar.xz
 
 mkdir -p $CACHE_DIR
 if ! [ -e $CACHE_DIR/$FILE_NAME ]; then
