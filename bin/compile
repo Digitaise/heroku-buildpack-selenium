@@ -2,31 +2,4 @@
 
 set -e
 
-BUILD_DIR=$1
-CACHE_DIR=$2
-
-# config
-# http://orm-buildpack.s3.amazonaws.com/Xvfb.tar.gz
-
-# Buildpack URL
-FILE_NAME=Xvfb.tar.xz
-BUILDPACK_XVFB_PACKAGE=https://raw.githubusercontent.com/kenshin23/xvfb-portable-binary/master/Xvfb.tar.xz
-
-mkdir -p $CACHE_DIR
-if ! [ -e $CACHE_DIR/$FILE_NAME ]; then
-  echo "-----> Fetching XVFB binaries at ${BUILDPACK_XVFB_PACKAGE}"
-  curl $BUILDPACK_XVFB_PACKAGE -s -o $CACHE_DIR/$FILE_NAME
-fi
-
-echo "-----> Extracting XVFB binaries to ${BUILD_DIR}/vendor/xvfb"
-tar xvf $CACHE_DIR/$FILE_NAME -C $CACHE_DIR
-mkdir -p $BUILD_DIR/bin
-mkdir -p $BUILD_DIR/share
-mkdir -p $BUILD_DIR/vendor/lib
-
-cp -R $CACHE_DIR/cde-root/usr/bin/* $BUILD_DIR/bin
-cp -R $CACHE_DIR/cde-root/usr/share/* $BUILD_DIR/share
-cp -R $CACHE_DIR/cde-root/usr/lib/* $BUILD_DIR/vendor/lib
-
-
 Xvfb :10 &
