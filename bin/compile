@@ -19,7 +19,7 @@ if ! [ -e $CACHE_DIR/$FILE_NAME ]; then
 fi
 
 echo "-----> Extracting XVFB binaries to ${BUILD_DIR}/vendor/xvfb"
-tar jxf $CACHE_DIR/$FILE_NAME -C $CACHE_DIR
+tar xvf $CACHE_DIR/$FILE_NAME -C $CACHE_DIR
 mkdir -p $BUILD_DIR/bin
 mkdir -p $BUILD_DIR/share
 mkdir -p $BUILD_DIR/vendor/lib
